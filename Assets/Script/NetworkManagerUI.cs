@@ -1,44 +1,51 @@
+using TMPro;
+using Unity.Netcode;
+using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
-using FishNet;
-using FishNet.Managing;
-
 public class NetworkManagerUI : MonoBehaviour
 {
     [Header("UI References")]
     [SerializeField] private Button hostButton;
     [SerializeField] private Button clientButton;
     [SerializeField] private TextMeshProUGUI statusText;
-
     private void Awake()
     {
+        // Menambahkan listener event pada tombol UI
         hostButton.onClick.AddListener(OnHostButtonClicked);
         clientButton.onClick.AddListener(OnClientButtonClicked);
     }
-
     private void OnHostButtonClicked()
     {
-        // Menjalankan Server dan Client lokal sekaligus (Host) di FishNet
-        InstanceFinder.ServerManager.StartConnection();
-        InstanceFinder.ClientManager.StartConnection();
-        UpdateUIStatus("Status: Connected as HOST");
+        // Menjalankan fungsi StartHost dari NetworkManager NGO
+        if (NetworkManager.Singleton.StartHost())
+        {
+            UpdateUIStatus("Status: Connected as HOST");
+        }
+        else
+        {
+            UpdateUIStatus("Status: Failed to Start Host");
+        }
     }
-
     private void OnClientButtonClicked()
     {
-        // Menjalankan Client saja di FishNet
-        InstanceFinder.ClientManager.StartConnection();
-        UpdateUIStatus("Status: Connecting as CLIENT...");
+        // Menjalankan fungsi StartClient dari NetworkManager NGO
+        if (NetworkManager.Singleton.StartClient())
+        {
+            UpdateUIStatus("Status: Connecting as CLIENT...");
+        }
+        else
+        {
+            UpdateUIStatus("Status: Failed to Start Client");
+        }
     }
-
     private void UpdateUIStatus(string message)
     {
         if (statusText != null)
         {
             statusText.text = message;
         }
-
+        // Menyembunyikan tombol pilihan setelah role dipilih
         hostButton.gameObject.SetActive(false);
         clientButton.gameObject.SetActive(false);
     }
