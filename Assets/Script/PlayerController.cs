@@ -4,9 +4,18 @@ using UnityEngine.UI;
 using TMPro;
 public class PlayerController : NetworkBehaviour
 {
+    [Header("Movement Settings")]
+    [SerializeField] private GameObject bulletPrefab;
+    [SerializeField] private Transform firePoint;
+    [SerializeField] private ParticleSystem muzzleFlashVFX;
+
+    [Header("Movement Settings")]
+    [SerializeField] private float moveSpeed = 5f;
+
     [Header("Network Sync Variables")]
     public NetworkVariable<int> health = new NetworkVariable<int>(100);
     public NetworkVariable<int> score = new NetworkVariable<int>(0);
+
     [Header("UI References")]
     [SerializeField] private Slider healthSlider;
     [SerializeField] private TextMeshProUGUI scoreText;
@@ -23,6 +32,9 @@ public class PlayerController : NetworkBehaviour
         if (IsOwner)
         {
             GetComponent<Renderer>().material.color = Color.green;
+            float randomX = Random.Range(-3f, 3f);
+            float randomZ = Random.Range(-3f, 3f);
+            transform.position = new Vector3(randomX, 0.5f, randomZ);
         }
         else
         {
@@ -76,8 +88,31 @@ public class PlayerController : NetworkBehaviour
         {
             AddScoreServerRpc(5);
         }
+
+        if (Input.GetButtonDown("Fire1") || Input.GetKeyDown(KeyCode.Space))
+        {
+            // Kirim perintah dari Client ke Server
+            ShootServerRpc();
+        }
+
+        HandleMovement();
     }
-    // Karena WritePermission = Server, pemicuan dari Client membutuhkan ServerRpc
+
+    private void HandleMovement()
+    {
+        // Membaca input keyboard (WASD / Panah)
+        float horizontal = Input.GetAxis("Horizontal");
+        float vertical = Input.GetAxis("Vertical");
+
+        Vector3 moveDirection = new Vector3(horizontal, 0f, vertical).normalized;
+
+        if (moveDirection.magnitude >= 0.1f)
+        {
+            // Memindahkan posisi karakter saja
+            transform.Translate(moveDirection * moveSpeed * Time.deltaTime, Space.World);
+        }
+    }
+// Karena WritePermission = Server, pemicuan dari Client membutuhkan ServerRpc
     [ServerRpc]
     private void TakeDamageServerRpc(int damageAmount)
     {
@@ -87,5 +122,36 @@ public class PlayerController : NetworkBehaviour
     private void AddScoreServerRpc(int scoreAmount)
     {
         score.Value += scoreAmount;
+    }
+    [ServerRpc]
+    private void ShootServerRpc()
+    {
+        if (bulletPrefab == null || firePoint == null) return;
+        // Server melakukan Spawn peluru nyata di dunia permainan
+        GameObject bulletInstance = Instantiate(bulletPrefab, firePoint.position,
+       firePoint.rotation);
+
+        // Daftarkan peluru ke dalam jaringan NGO
+        NetworkObject bulletNetworkObject = bulletInstance.GetComponent<NetworkObject>();
+        bulletNetworkObject.Spawn();
+        // Minta semua Client untuk memutar efek visual & suara tembakan
+        PlayShootEffectsClientRpc();
+    }
+
+    [ClientRpc]
+    private void PlayShootEffectsClientRpc()
+    {
+        // Putar efek partikel di lokasi tembakan jika ada
+        if (muzzleFlashVFX != null)
+        {
+            muzzleFlashVFX.Play();
+        }
+        // Opsional: Tambahkan efek suara tembakan (AudioSource.PlayClipAtPoint)
+    }
+    public void TakeDamage(int amount)
+    {
+        if (!IsServer) return;
+        // Kurangi nilai NetworkVariable health
+        health.Value = Mathf.Max(0, health.Value - amount);
     }
 }
